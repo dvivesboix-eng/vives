@@ -1,4 +1,3 @@
 streamlit
 pandas
-streamlit-gsheets-connection
-python-dateutil
+gspread # Librería estándar para interactuar con Google Sheets (necesaria para la conexión nativa)
