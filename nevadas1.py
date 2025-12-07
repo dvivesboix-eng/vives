@@ -352,3 +352,4 @@ if not df_resultados.empty:
     col_metrics[1].metric("Partes Registrados", df_resultados.shape[0])
 
     col_metrics[2].metric("Total Kilómetros Reportados", f"{df_resultados['TOTAL_KM'].sum():,.0f} km")
+
