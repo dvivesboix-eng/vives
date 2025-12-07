@@ -127,7 +127,7 @@ def cargar_datos_compartidos():
         return pd.DataFrame(columns=COLUMNAS_FINALES)
         
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
+        conn = st.connection("gsheets", type="pandas")
         # Aseguramos que solo leemos las columnas que vamos a escribir/mostrar
         df_gs = conn.read(spreadsheet=GOOGLE_SHEET_URL, worksheet=TABLA_TRABAJO, usecols=COLUMNAS_FINALES)
         # Convertir tipos si es necesario
@@ -350,4 +350,5 @@ if not df_resultados.empty:
     col_metrics = st.columns(3)
     col_metrics[0].metric("Total Rutas Únicas con Partes", df_resultados['layer'].nunique())
     col_metrics[1].metric("Partes Registrados", df_resultados.shape[0])
+
     col_metrics[2].metric("Total Kilómetros Reportados", f"{df_resultados['TOTAL_KM'].sum():,.0f} km")
