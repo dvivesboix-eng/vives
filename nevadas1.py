@@ -13,7 +13,7 @@ from streamlit_gsheets_connection import GSheetsConnection
 # ----------------------------------------------------
 # 1. Asegúrate de tener un archivo .streamlit/secrets.toml configurado
 # 2. Configura el URL de tu Google Sheet (ej. desde la barra del navegador)
-GOOGLE_SHEET_URL = "URL_DE_TU_HOJA_DE_CALCULO_GOOGLE_AQUI" 
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/TU_ID_DE_HOJA_AQUÍ/edit#gid=0" 
 TABLA_TRABAJO = "Partes" # Nombre de la pestaña o hoja dentro del archivo
 
 # Configuración de la página
@@ -350,4 +350,5 @@ if not df_resultados.empty:
     col_metrics = st.columns(3)
     col_metrics[0].metric("Total Rutas Únicas con Partes", df_resultados['layer'].nunique())
     col_metrics[1].metric("Partes Registrados", df_resultados.shape[0])
+
     col_metrics[2].metric("Total Kilómetros Reportados", f"{df_resultados['TOTAL_KM'].sum():,.0f} km")
