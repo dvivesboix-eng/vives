@@ -12,7 +12,7 @@ from datetime import datetime, time, date, timedelta # Añadido timedelta para e
 # ----------------------------------------------------
 # 1. Asegúrate de tener un archivo .streamlit/secrets.toml configurado
 # 2. Configura el URL de tu Google Sheet (ej. desde la barra del navegador)
-GOOGLE_SHEET_URL = "URL_DE_TU_HOJA_DE_CALCULO_GOOGLE_AQUI" 
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1Yfwd-J8S3IdaikxWTyWmOKomXx-h-RJKYkDn3kejuf0/edit?gid=365895334#gid=365895334" 
 TABLA_TRABAJO = "Partes" # Nombre de la pestaña o hoja dentro del archivo
 
 # Configuración de la página
@@ -351,4 +351,5 @@ if not df_resultados.empty:
     col_metrics[1].metric("Partes Registrados", df_resultados.shape[0])
 
     col_metrics[2].metric("Total Kilómetros Reportados", f"{df_resultados['TOTAL_KM'].sum():,.0f} km")
+
 
