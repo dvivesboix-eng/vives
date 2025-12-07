@@ -3,7 +3,7 @@ import pandas as pd
 import io
 import re
 from datetime import datetime, time, date, timedelta # Añadido timedelta para el cálculo de tiempo
-
+from streamlit_gsheets_connection import GSheetsConnection
 # 🚨 IMPORTANTE: Se necesita la librería 'streamlit-gsheets-connection'
 # pip install streamlit-gsheets-connection
 
@@ -121,7 +121,7 @@ COLUMNAS_FINALES = [
 @st.cache_data(ttl=5) # Recarga los datos cada 5 segundos para ver las actualizaciones
 def cargar_datos_compartidos():
     """Conecta a Google Sheets y devuelve el DataFrame de resultados."""
-    if GOOGLE_SHEET_URL == "URL_DE_TU_HOJA_DE_CALCULO_GOOGLE_AQUI":
+    if GOOGLE_SHEET_URL == "conn = st.connection("gsheets", type=GSheetsConnection)":
         st.warning("🚨 Por favor, actualiza la variable GOOGLE_SHEET_URL con tu enlace.")
         return pd.DataFrame(columns=COLUMNAS_FINALES)
         
@@ -351,5 +351,6 @@ if not df_resultados.empty:
     col_metrics[1].metric("Partes Registrados", df_resultados.shape[0])
 
     col_metrics[2].metric("Total Kilómetros Reportados", f"{df_resultados['TOTAL_KM'].sum():,.0f} km")
+
 
 
