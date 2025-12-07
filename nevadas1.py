@@ -2,25 +2,20 @@ import streamlit as st
 import pandas as pd
 import io
 import re
-from datetime import datetime, time, date, timedelta # Añadido timedelta para el cálculo de tiempo
+from datetime import datetime, time, date, timedelta
 
-# 🚨 IMPORTANTE: Se necesita la librería 'streamlit-gsheets-connection'
-# pip install streamlit-gsheets-connection
-from streamlit_gsheets_connection import GSheetsConnection 
+# 🚨 IMPORTANTE: Se ha eliminado la dependencia de 'streamlit-gsheets-connection'
+# Los datos ahora se guardan en la memoria de la sesión (st.session_state)
 
 # ----------------------------------------------------
-# --- CONFIGURACIÓN DE CONEXIÓN A GOOGLE SHEETS ---
+# --- CONFIGURACIÓN Y CONSTANTES ---
 # ----------------------------------------------------
-# 1. Asegúrate de tener un archivo .streamlit/secrets.toml configurado
-# 2. Configura el URL de tu Google Sheet (ej. desde la barra del navegador)
-GOOGLE_SHEET_URL = "URL_DE_TU_HOJA_DE_CALCULO_GOOGLE_AQUI" 
-TABLA_TRABAJO = "Partes" # Nombre de la pestaña o hoja dentro del archivo
 
 # Configuración de la página
-st.set_page_config(page_title="Gestor de Rutas - Compartido", layout="wide")
+st.set_page_config(page_title="Gestor de Rutas - Sesión", layout="wide")
 
-st.title("📝 Gestor de Partes de Ruta (Datos Compartidos)")
-st.caption("Los datos de la tabla inferior se actualizan y comparten inmediatamente.")
+st.title("📝 Gestor de Partes de Ruta (Datos de Sesión)")
+st.caption("Los datos de la tabla inferior se almacenan solo en la memoria de la sesión y se perderán al reiniciar la app.")
 
 # --- 1. BASE DE DATOS COMPLETA (77 RUTAS) ---
 # Esta es la base de las rutas disponibles para seleccionar, es fija.
@@ -118,29 +113,15 @@ COLUMNAS_FINALES = [
     'FECHA', 'H.INICIO', 'H.FIN', 'TIEMPO'
 ]
 
-# --- NUEVA FUNCIÓN PARA CONECTAR Y CARGAR DATOS ---
-@st.cache_data(ttl=5) # Recarga los datos cada 5 segundos para ver las actualizaciones
-def cargar_datos_compartidos():
-    """Conecta a Google Sheets y devuelve el DataFrame de resultados."""
-    if GOOGLE_SHEET_URL == "URL_DE_TU_HOJA_DE_CALCULO_GOOGLE_AQUI":
-        st.warning("🚨 Por favor, actualiza la variable GOOGLE_SHEET_URL con tu enlace.")
-        return pd.DataFrame(columns=COLUMNAS_FINALES)
-        
-    try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        # Aseguramos que solo leemos las columnas que vamos a escribir/mostrar
-        df_gs = conn.read(spreadsheet=GOOGLE_SHEET_URL, worksheet=TABLA_TRABAJO, usecols=COLUMNAS_FINALES)
-        # Convertir tipos si es necesario
-        df_gs['RUTA'] = pd.to_numeric(df_gs['RUTA'], errors='coerce')
-        df_gs['DISTANCIA'] = pd.to_numeric(df_gs['DISTANCIA'], errors='coerce')
-        df_gs['PASADAS'] = pd.to_numeric(df_gs['PASADAS'], errors='coerce')
-        df_gs['TOTAL_KM'] = pd.to_numeric(df_gs['TOTAL_KM'], errors='coerce')
-        df_gs['TIEMPO'] = pd.to_numeric(df_gs['TIEMPO'], errors='coerce')
-        return df_gs
-    except Exception as e:
-        st.error(f"⚠️ Error al conectar o leer Google Sheet: {e}")
-        st.info(f"Por favor, revisa que la URL ('{GOOGLE_SHEET_URL}') y la pestaña ('{TABLA_TRABAJO}') sean correctas y que las credenciales estén configuradas en .streamlit/secrets.toml.")
-        return pd.DataFrame(columns=COLUMNAS_FINALES)
+# --- NUEVA FUNCIÓN PARA INICIALIZAR DATOS EN LA SESIÓN ---
+def inicializar_o_cargar_datos():
+    """Inicializa el DataFrame en la sesión de Streamlit si no existe."""
+    if 'df_resultados' not in st.session_state:
+        # Inicializa un DataFrame vacío con las columnas finales
+        st.session_state.df_resultados = pd.DataFrame(columns=COLUMNAS_FINALES)
+    
+    # Devuelve el DataFrame de la sesión para el flujo del programa
+    return st.session_state.df_resultados
 
 # --- FUNCIONES AUXILIARES ---
 
@@ -181,7 +162,7 @@ def safe_str(val):
     return str(val)
 
 # --- CARGA INICIAL DE DATOS ---
-df_resultados = cargar_datos_compartidos()
+df_resultados = inicializar_o_cargar_datos()
 
 # --- ÁREA DE EDICIÓN ---
 
@@ -204,6 +185,7 @@ with st.container(border=True):
     st.divider()
     
     # Intenta precargar los últimos valores guardados para ese tramo si existen
+    # Usa df_resultados que ahora apunta a st.session_state.df_resultados
     df_tramo = df_resultados[df_resultados['layer'] == fila_datos['layer']]
     ultimo_parte = df_tramo.sort_values(by=['FECHA', 'H.FIN'], ascending=False).iloc[0] if not df_tramo.empty else fila_datos
 
@@ -243,7 +225,9 @@ with st.container(border=True):
         ca1, ca2, ca3, ca4 = st.columns(4)
         
         val_distancia = ca1.number_input("Distancia (km Base)", value=safe_float(fila_datos.get('DISTANCIA')), step=0.1, format="%.2f", disabled=True)
-        val_pasadas = ca2.number_input("Pasadas", value=safe_float(ultimo_parte.get('PASADAS', fila_datos['PASADAS'])), step=1.0, format="%d")
+        # Se asegura de que PASADAS use el valor del último_parte si existe, si no, usa el valor de base, si es None, usa 1.0.
+        val_pasadas_default = safe_float(ultimo_parte.get('PASADAS', fila_datos['PASADAS'])) if ultimo_parte.get('PASADAS') is not None else 1.0
+        val_pasadas = ca2.number_input("Pasadas", value=val_pasadas_default, step=1.0, format="%d", min_value=1)
         
         # Cálculo automático de TOTAL_KM (Distancia * Pasadas)
         total_km_calculado = val_distancia * val_pasadas
@@ -279,9 +263,9 @@ with st.container(border=True):
         hora_fin = col_t3.time_input("Hora Fin", value=get_default_time('H.FIN'))
         
         # Botón de envío del formulario
-        submitted = st.form_submit_button("✅ Guardar Parte de Ruta y Compartir Datos", type="primary")
+        submitted = st.form_submit_button("✅ Guardar Parte de Ruta en Sesión", type="primary")
 
-        # --- LÓGICA DE PROCESAMIENTO Y GUARDADO ---
+        # --- LÓGICA DE PROCESAMIENTO Y GUARDADO EN SESIÓN ---
         if submitted:
             # 1. Calcular el tiempo total
             dt_inicio = datetime.combine(val_fecha, hora_inicio)
@@ -316,38 +300,37 @@ with st.container(border=True):
                 'TIEMPO': round(total_horas, 2) # Cálculo
             }], columns=COLUMNAS_FINALES)
             
-            # 3. Guardar en Google Sheets
+            # 3. Guardar en Session State
             try:
-                # Re-conectamos para la operación de escritura
-                conn = st.connection("gsheets", type=GSheetsConnection)
-                conn.append(data=nuevo_parte, worksheet=TABLA_TRABAJO)
+                # Concatena el nuevo parte con el DataFrame de la sesión
+                df_actual = st.session_state.df_resultados # Ya es una referencia, no necesita .copy() en la mayoría de los casos de Streamlit
+                st.session_state.df_resultados = pd.concat([df_actual, nuevo_parte], ignore_index=True)
                 
-                # Vaciamos la caché y mostramos éxito
-                st.cache_data.clear() # Fuerza la recarga inmediata de la tabla inferior
+                # Muestra éxito
                 st.success(f"✅ Parte guardado para **{fila_datos['layer']}** ({total_km_calculado:,.2f} km recorridos en {round(total_minutos, 0)} minutos).")
                 
             except Exception as e:
-                st.error(f"❌ Error al guardar en Google Sheets. Revisa la conexión: {e}")
+                st.error(f"❌ Error al guardar en la sesión. Contacte al desarrollador: {e}")
 
 st.divider()
 
-st.subheader("3. Histórico de Partes Registrados (Google Sheets)")
-st.caption("Esta tabla se actualiza automáticamente.")
+st.subheader("3. Histórico de Partes Registrados (Memoria de Sesión)")
+st.caption("Esta tabla refleja los datos guardados en esta sesión y se actualiza al instante.")
 
-# Mostrar la tabla de resultados
-if not df_resultados.empty:
+# Mostrar la tabla de resultados usando el DataFrame de la sesión
+if not st.session_state.df_resultados.empty:
     st.dataframe(
-        df_resultados.sort_values(by=['FECHA', 'H.FIN'], ascending=False),
+        st.session_state.df_resultados.sort_values(by=['FECHA', 'H.FIN'], ascending=False),
         use_container_width=True,
         height=300
     )
 else:
-    st.info("Aún no hay datos cargados del Google Sheet. Por favor, verifica la URL y credenciales.")
+    st.info("Aún no hay partes registrados en esta sesión. Completa el formulario para empezar.")
 
 # Pie de página o métricas (solo si hay datos)
-if not df_resultados.empty:
+if not st.session_state.df_resultados.empty:
     st.markdown("---")
     col_metrics = st.columns(3)
-    col_metrics[0].metric("Total Rutas Únicas con Partes", df_resultados['layer'].nunique())
-    col_metrics[1].metric("Partes Registrados", df_resultados.shape[0])
-    col_metrics[2].metric("Total Kilómetros Reportados", f"{df_resultados['TOTAL_KM'].sum():,.0f} km")
+    col_metrics[0].metric("Total Rutas Únicas con Partes", st.session_state.df_resultados['layer'].nunique())
+    col_metrics[1].metric("Partes Registrados", st.session_state.df_resultados.shape[0])
+    col_metrics[2].metric("Total Kilómetros Reportados", f"{st.session_state.df_resultados['TOTAL_KM'].sum():,.0f} km")
